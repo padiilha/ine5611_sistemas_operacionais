@@ -12,9 +12,11 @@ namespace utils
 {
   std::string currentUnixTime(void);
 
+  const int INPUT_INTERVAL = 20000; // uSECS
   const int MAX_MISSILE_CAPACITY = 6;
-  const int MISSILE_GENERATOR_INTERVAL = 1; // SECS
-  const int MISSILE_MOV_SPEED_FACT = 62500; // uSECS
+  const int MISSILE_BATTERY_MOV_SPEED_FACT = 100000; // uSECS
+  const int MISSILE_GENERATOR_INTERVAL = 1;          // SECS
+  const int MISSILE_MOV_SPEED_FACT = 62500;          // uSECS
 
   namespace Types
   {
@@ -50,7 +52,7 @@ namespace utils
     {
       int id = 0;
       int missiles = 6;
-      std::pair<int, int> pos = {0, 0};
+      int pos = 0;
     };
 
     struct AvailableMissiles : CriticalResource

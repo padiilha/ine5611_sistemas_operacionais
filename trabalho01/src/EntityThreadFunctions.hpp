@@ -1,6 +1,7 @@
 #ifndef __ENTITY_HPP__
 #define __ENTITY_HPP__
 
+#include <ncurses.h>
 #include <unistd.h>
 
 #include <functional>

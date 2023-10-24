@@ -6,22 +6,22 @@ namespace EntityThreadFunctions
   {
     void writerEnterCriticalSection(utils::Types::CriticalResource *resource)
     {
-      sem_wait(&resource->writerSem); // bloqueia o semafaro de escrita
-      resource->writeCount++;         // aumenta o numero de escritores
+      sem_wait(&resource->writerSem);
+      resource->writeCount++;
       if (resource->writeCount == 1)
-        sem_wait(&resource->readTrySem); // se o numero de escritores for 1, bloqueia tentativa de leitura
-      sem_post(&resource->writerSem);    // libera o semafaro de escrita
-      sem_wait(&resource->resourceSem);  // bloqueia o recurso
+        sem_wait(&resource->readTrySem);
+      sem_post(&resource->writerSem);
+      sem_wait(&resource->resourceSem);
     }
 
     void writerExitCriticalSection(utils::Types::CriticalResource *resource)
     {
-      sem_post(&resource->resourceSem); // libera o recurso
-      sem_wait(&resource->writerSem);   // bloqueia o escritor
-      resource->writeCount--;           // diminui o numero de escritores
+      sem_post(&resource->resourceSem);
+      sem_wait(&resource->writerSem);
+      resource->writeCount--;
       if (resource->writeCount == 0)
-        sem_post(&resource->readTrySem); // se o numero de escritores for 0, libera tentativa de leitura
-      sem_post(&resource->writerSem);    // libera o escritor
+        sem_post(&resource->readTrySem);
+      sem_post(&resource->writerSem);
     }
 
     void autoWriteCriticalSection(utils::Types::CriticalResource *resource, std::function<void()> op)
@@ -33,23 +33,23 @@ namespace EntityThreadFunctions
 
     utils::Types::CriticalResource readerEnterCriticalSection(utils::Types::CriticalResource *resource)
     {
-      sem_wait(&resource->readTrySem); // bloqueia a tentativa de leitura
-      sem_wait(&resource->readerSem);  // bloqueia a leitura
-      resource->readCount++;           // aumenta o numero de leitores
+      sem_wait(&resource->readTrySem);
+      sem_wait(&resource->readerSem);
+      resource->readCount++;
       if (resource->readCount == 1)
-        sem_wait(&resource->resourceSem); // se o numero de leitores for 1, bloqueia o recurso
-      sem_post(&resource->readerSem);     // libera a leitura
-      sem_post(&resource->readTrySem);    // libera a tentativa de leitura
+        sem_wait(&resource->resourceSem);
+      sem_post(&resource->readerSem);
+      sem_post(&resource->readTrySem);
       return *resource;
     }
 
     void readerExitCriticalSection(utils::Types::CriticalResource *resource)
     {
-      sem_wait(&resource->readerSem); // bloqueia a leitura
-      resource->readCount--;          // diminui o numero de leitores
+      sem_wait(&resource->readerSem);
+      resource->readCount--;
       if (resource->readCount == 0)
-        sem_post(&resource->resourceSem); // se o numero de leitores for 0, libera o recurso
-      sem_post(&resource->readerSem);     // libera a leitura
+        sem_post(&resource->resourceSem);
+      sem_post(&resource->readerSem);
     }
 
     void autoReadCriticalSection(utils::Types::CriticalResource *resource, std::function<void(utils::Types::CriticalResource resource)> op)
@@ -89,11 +89,56 @@ namespace EntityThreadFunctions
 
   void *helicopter(void *arg)
   {
-    utils::Types::GameState *state = (utils::Types::GameState *)arg; // atribui a um ponteiro do tipo GameState o que?
-    utils::Types::Board &board = state->boardState;                  // atribui ao local onde aponta o ponteiro board o valor de boardState
+    utils::Types::GameState *state = (utils::Types::GameState *)arg;
+    utils::Types::Board &board = state->boardState;
+    std::pair<int, int> &pos = state->helicopter->pos;
+    int posX = pos.first;
+    int posY = pos.second;
+    int width = state->boardState[0].size();
+    int height = state->boardState.size();
+    std::vector<utils::Types::Element *, utils::Types::Element *> &flightArea = board[width][height];
     bool alive = true;
 
-    // completar
+    while (true)
+    {
+      auto &board = state->boardState;
+
+      int ch;
+      int newPosX;
+      int newPosY;
+
+      if ((ch = getch()) != ERR)
+      {
+        if (ch >= 'A' && ch <= 'Z')
+          ch += 32;
+
+        switch (ch)
+        {
+        case 'w':
+          newPosY = posY - 1;
+          break;
+        case 'a':
+          newPosX = posX - 1;
+          break;
+        case 's':
+          newPosY = posY + 1;
+          break;
+        case 'd':
+          newPosX = posX + 1;
+          break;
+        }
+      }
+
+      if ((newPosX != posX || newPosY != posY) && (newPosX > 0 && newPosY > 0) && (newPosX < width && newPosY < height))
+      {
+        flightArea[posX][posY]->displayValue = 0;
+        posX = newPosX;
+        posY = newPosY;
+      }
+
+      flightArea[posX][posY]->displayValue = utils::Types::EntityEnum::HELICOPTER;
+      usleep(utils::INPUT_INTERVAL);
+    }
   }
 
   void *missileBattery(void *arg)
@@ -101,23 +146,54 @@ namespace EntityThreadFunctions
     int id;
     utils::Types::GameState *state;
     utils::Types::MissileBattery *self;
-
     utils::Types::MissileBatteryProps *props = (utils::Types::MissileBatteryProps *)arg;
+    int width = state->boardState[0].size();
+    int posX = self->pos;
 
     id = props->id;
     state = props->state;
     self = state->missileBattery[id];
+    posX = width / 2;
 
     delete props;
 
     while (true)
     {
       auto &board = state->boardState;
-      auto pos = self->pos;
-      auto x = pos.first;
-      auto y = pos.second;
+      int newPosX;
+      utils::Types::MissileProps *props = new utils::Types::MissileProps;
 
-      // completar
+      props->state = state;
+      props->missileBatteryPos = posX;
+      handleMissileLaunch(state, props);
+
+      if (id % 2 == 0)
+      {
+        newPosX = posX + 1 % width;
+      }
+      else
+      {
+        newPosX = posX - 1 % width;
+      }
+
+      Sync::autoWriteCriticalSection( // oqq faz
+          state->boardState[newPosX],
+          [&state, &self, posX, newPosX, id]()
+          {
+            if (state->boardState[newPosX]->displayValue == 0)
+            {
+              state->boardState[newPosX]->displayValue = utils::Types::EntityEnum::MISSILE_BATTERY;
+              state->boardState[newPosX]->entityId = id;
+              state->boardState[posX]->entityId = 0;
+              self->pos = newPosX;
+              return;
+            }
+            state->boardState[newPosX]->displayValue = 0;
+            state->boardState[newPosX]->entityId = 0;
+            state->boardState[posX]->displayValue = utils::Types::EntityEnum::MISSILE_BATTERY;
+          });
+
+      usleep(utils::MISSILE_BATTERY_MOV_SPEED_FACT / state->difficulty);
     }
   }
 
